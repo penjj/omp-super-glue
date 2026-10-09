@@ -1,0 +1,25 @@
+{
+  "name": "penjj-plugins",
+  "description": "penjj 的 omp 插件市场",
+  "owner": {
+    "name": "penjj"
+  },
+  "plugins": [
+    {
+      "name": "agent-porter",
+      "source": "./",
+      "description": "把其他 harness（codebuddy/qoder/claude/cursor/…）的 agents、commands、skills 移植为 omp 斜杠命令",
+      "version": "0.1.0",
+      "category": "development",
+      "keywords": [
+        "agent",
+        "porter",
+        "extension",
+        "commands",
+        "skills",
+        "codebuddy",
+        "qoder"
+      ]
+    }
+  ]
+}
