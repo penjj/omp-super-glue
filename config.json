@@ -1,0 +1,10 @@
+{
+  "mode": "dispatch",
+  "prefixRules": [
+    ["^d2c-(?:block|page)-(\\w+)$", "d2c:$1"],
+    ["^opsx-(\\w+)$", "opsx:$1"]
+  ],
+  "modelAliases": {
+    "space-bunny": "openrouter/inclusionai/ling-3.1-flash:high"
+  }
+}

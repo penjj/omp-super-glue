@@ -1,0 +1,7 @@
+{
+  "name": "agent-porter",
+  "version": "0.1.0",
+  "description": "把其他 harness（codebuddy/qoder/claude/cursor/…）的 agents、commands、skills 移植为 omp 斜杠命令",
+  "extensions": ["./index.ts"],
+  "license": "MIT"
+}
