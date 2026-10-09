@@ -8,6 +8,23 @@
 |command|`<harness>/commands/[ns/]<name>.md`|子目录形式 `/<ns>:<name>`；扁平形式按 prefixRules|
 |skill|`<harness>/skills/<name>/SKILL.md`|`/<name>`|
 
+## 安装
+
+```bash
+# 一键（omp 插件市场）
+omp plugin marketplace add https://github.com/penjj/agent-porter
+omp plugin install agent-porter
+
+# 或从本地路径安装
+omp install /path/to/agent-porter
+
+# 或手动：克隆到扩展目录
+git clone https://github.com/penjj/agent-porter ~/.omp/agent/extensions/agent-porter    # 全局（所有项目）
+git clone https://github.com/penjj/agent-porter <project>/.omp/extensions/agent-porter  # 项目级（仅本项目）
+```
+
+两种扩展目录 omp 都自动发现（实测）。
+
 ## 背景（omp/18.8.6 实测）
 
 - task-agent 发现只认 `.omp/agents`（项目）、`~/.omp/agent/agents`
