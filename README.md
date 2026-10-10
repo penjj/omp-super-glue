@@ -41,11 +41,10 @@ git clone https://github.com/penjj/agent-porter <project>/.omp/extensions/super-
 ## 扫描（多源组合去重，先到先得）
 
 项目级（cwd）：所有含对应子目录（`agents/`、`commands/`、
-`skills/`）的目录——dot-dir 与普通目录皆可（`.codebuddy/`
-与 `Doubao/` 同等对待）。`.agents`、`.omp` 优先，其余字典序
-（`.claude`、`.qoder`、`.github`、…）。
+`skills/`）的 dot-dir——`.agents`、`.omp` 优先，其余字典序
+（`.claude`、`.codebuddy`、`.qoder`、`.github`、…）。
 用户级（~）：`~/.omp/agent/agents`（agent 原生根）、`~/.agents/`
-（标准）、其余 `~/` 下任意目录。
+（标准）、其余 `~/` 下的 dot-dir。
 
 command 与 skill 的扫描**跳过原生已覆盖的根**（`.omp`、`.claude`、
 `.agent[s]`、`.codex`、`.opencode`，skill 另有 `.github`）——

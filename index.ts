@@ -5,8 +5,7 @@
  * 布局约定（demo 与本仓库实测）：智能体在 `<harness>/agents/<name>.md`，
  * 指令在 `<harness>/commands/[ns/]<name>.md`，技能在
  * `<harness>/skills/<name>/SKILL.md`（harness = .codebuddy / .qoder /
- * .claude / .agents / .github / Doubao / ... 任意目录，dot-dir 与
- * 普通目录皆可）。
+ * .claude / .agents / .github / ... 任意 dot-dir）。
  *
  * omp/18.8.6 实测结论：
  *   - task-agent 发现只认 `.omp/agents`（项目）、`~/.omp/agent/agents`
@@ -136,7 +135,7 @@ function loadConfig(dir: string): PorterConfig {
 
 /**
  * 项目级 harness 根（绝对路径）：cwd 下所有含指定子目录的
- * 目录（dot-dir 与普通目录皆可，如 .codebuddy/ 与 Doubao/）。
+ * dot-dir（harness 约定即白名单；普通项目目录不扫）。
  * ".agents"（跨 harness 标准）与 ".omp"（omp 原生）优先，其余字典序。
  */
 function projectHarnessRoots(cwd: string, subdir: string): string[] {
@@ -144,7 +143,7 @@ function projectHarnessRoots(cwd: string, subdir: string): string[] {
   const rest: string[] = [];
   try {
     for (const entry of readdirSync(cwd).sort()) {
-      if (priority.includes(entry)) continue;
+      if (!entry.startsWith(".") || priority.includes(entry)) continue;
       if (isDirectory(join(cwd, entry, subdir))) rest.push(entry);
     }
   } catch {
@@ -157,9 +156,8 @@ function projectHarnessRoots(cwd: string, subdir: string): string[] {
 
 /**
  * 用户级 harness 根（绝对路径）：~/.omp/agent（agents 特殊路径，
- * 注意是单数 agent）与 ~ 下任意含指定子目录的目录
- * （dot-dir 与普通目录皆可；".omp" 本体除外——其 agents/
- * 由上一行的原生路径单独特判）。
+ * 注意是单数 agent）与 ~ 下任意含指定子目录的 dot-dir
+ * （".omp" 本体除外——其 agents/ 由上一行的原生路径单独特判）。
  */
 function userHarnessRoots(home: string, subdir: string): string[] {
   const roots: string[] = [];
@@ -170,7 +168,7 @@ function userHarnessRoots(home: string, subdir: string): string[] {
   const rest: string[] = [];
   try {
     for (const entry of readdirSync(home).sort()) {
-      if (entry === "omp" || priority.includes(entry)) {
+      if (!entry.startsWith(".") || entry === "omp" || priority.includes(entry)) {
         continue;
       }
       if (isDirectory(join(home, entry, subdir))) rest.push(entry);
