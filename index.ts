@@ -5,7 +5,8 @@
  * 布局约定（demo 与本仓库实测）：智能体在 `<harness>/agents/<name>.md`，
  * 指令在 `<harness>/commands/[ns/]<name>.md`，技能在
  * `<harness>/skills/<name>/SKILL.md`（harness = .codebuddy / .qoder /
- * .claude / .agents / .github / ... 任意 dot-dir）。
+ * .claude / .agents / .github / Doubao / ... 任意目录，dot-dir 与
+ * 普通目录皆可）。
  *
  * omp/18.8.6 实测结论：
  *   - task-agent 发现只认 `.omp/agents`（项目）、`~/.omp/agent/agents`
@@ -28,8 +29,8 @@
  *     （与原生 /skill:<name> 的用户调用模板一致）
  *
  * 多源组合去重：按扫描顺序（项目级在前、用户级在后；同级别内
- * .agents/.omp 优先，其余字典序），同名定义先到先得；被覆盖的
- * 文件与命令名冲突都记入会话启动报告。原件零改动。
+ * .agents/.omp 优先，其余字典序），同名定义与命令名冲突都先到
+ * 先得。原件零改动。
  *
  * 配置（可选，与本文件同目录 config.json）：
  * {
@@ -42,7 +43,7 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 interface AgentDef {
   name: string;
@@ -61,7 +62,8 @@ interface CommandSpec {
   command: string;
   description: string;
   kind: "agent" | "command" | "skill";
-  file: string;
+  /** 来源 harness 根（绝对路径；启动报告按它聚合） */
+  root: string;
   run: (args: string, ctx: unknown) => void;
 }
 
@@ -133,7 +135,8 @@ function loadConfig(dir: string): PorterConfig {
 }
 
 /**
- * 项目级 harness 根（绝对路径）：cwd 下所有含指定子目录的 dot-dir。
+ * 项目级 harness 根（绝对路径）：cwd 下所有含指定子目录的
+ * 目录（dot-dir 与普通目录皆可，如 .codebuddy/ 与 Doubao/）。
  * ".agents"（跨 harness 标准）与 ".omp"（omp 原生）优先，其余字典序。
  */
 function projectHarnessRoots(cwd: string, subdir: string): string[] {
@@ -141,7 +144,7 @@ function projectHarnessRoots(cwd: string, subdir: string): string[] {
   const rest: string[] = [];
   try {
     for (const entry of readdirSync(cwd).sort()) {
-      if (!entry.startsWith(".") || priority.includes(entry)) continue;
+      if (priority.includes(entry)) continue;
       if (isDirectory(join(cwd, entry, subdir))) rest.push(entry);
     }
   } catch {
@@ -154,7 +157,9 @@ function projectHarnessRoots(cwd: string, subdir: string): string[] {
 
 /**
  * 用户级 harness 根（绝对路径）：~/.omp/agent（agents 特殊路径，
- * 注意是单数 agent）与 ~ 下任意含指定子目录的 dot-dir。
+ * 注意是单数 agent）与 ~ 下任意含指定子目录的目录
+ * （dot-dir 与普通目录皆可；".omp" 本体除外——其 agents/
+ * 由上一行的原生路径单独特判）。
  */
 function userHarnessRoots(home: string, subdir: string): string[] {
   const roots: string[] = [];
@@ -165,7 +170,7 @@ function userHarnessRoots(home: string, subdir: string): string[] {
   const rest: string[] = [];
   try {
     for (const entry of readdirSync(home).sort()) {
-      if (!entry.startsWith(".") || entry === "omp" || priority.includes(entry)) {
+      if (entry === "omp" || priority.includes(entry)) {
         continue;
       }
       if (isDirectory(join(home, entry, subdir))) rest.push(entry);
@@ -235,9 +240,8 @@ function parseAgentFile(file: string, source: string, native: boolean): AgentDef
 
 function collectAgents(
   sources: { dir: string; native: boolean }[],
-): { agents: AgentDef[]; shadowed: { name: string; file: string; winner: string }[] } {
+): AgentDef[] {
   const byName = new Map<string, AgentDef>();
-  const shadowed: { name: string; file: string; winner: string }[] = [];
   for (const { dir, native } of sources) {
     let entries: string[] = [];
     try {
@@ -252,15 +256,11 @@ function collectAgents(
       if (!isFile(file)) continue;
       const def = parseAgentFile(file, dir, native);
       if (!def) continue;
-      const winner = byName.get(def.name);
-      if (winner) {
-        shadowed.push({ name: def.name, file, winner: winner.file });
-        continue;
-      }
-      byName.set(def.name, def);
+      // 多源同名：先到先得（扫描顺序即优先级），其余静默丢弃
+      if (!byName.has(def.name)) byName.set(def.name, def);
     }
   }
-  return { agents: [...byName.values()], shadowed };
+  return [...byName.values()];
 }
 
 function commandName(name: string, rules: [string, string][]): string {
@@ -405,17 +405,16 @@ export default function (pi: ExtensionAPI) {
   let prefixRules: [string, string][] = DEFAULT_PREFIX_RULES;
   let modelAliases: Record<string, string> = { ...DEFAULT_MODEL_ALIASES };
   let specs: CommandSpec[] = [];
-  let shadowedAgents: { name: string; file: string; winner: string }[] = [];
-  let shadowedCommands: { command: string; file: string; winner: string }[] = [];
   let oneShotModel: string | undefined;
 
   pi.setLabel("Agent Porter");
 
+  const cwd = process.cwd();
+  const home = homedir();
+
   try {
     if (cfg.prefixRules && cfg.prefixRules.length > 0) prefixRules = cfg.prefixRules;
     if (cfg.modelAliases) modelAliases = { ...DEFAULT_MODEL_ALIASES, ...cfg.modelAliases };
-    const cwd = process.cwd();
-    const home = homedir();
     const nativeProjectAgents = join(cwd, ".omp", "agents");
     const nativeUserAgents = join(home, ".omp", "agent", "agents");
 
@@ -435,14 +434,14 @@ export default function (pi: ExtensionAPI) {
         native: false,
       })),
     ];
-    const collected = collectAgents(agentSources);
-    shadowedAgents = collected.shadowed;
-    for (const agent of collected.agents) {
+    const agents = collectAgents(agentSources);
+    for (const agent of agents) {
       const command = commandName(agent.name, prefixRules);
       specs.push({
         command,
         description: `代理：${truncate(agent.description, 80)}`,
         kind: "agent",
+        root: dirname(agent.source),
         run: (args, ctx) => {
           const { mode: flagMode, rest } = parseFlags(args ?? "");
           const mode = flagMode ?? cfg.mode ?? "dispatch";
@@ -491,12 +490,12 @@ export default function (pi: ExtensionAPI) {
           }
           for (const sub of subEntries.sort()) {
             if (!sub.endsWith(".md") || sub.startsWith(".")) continue;
-            addFileCommand(pi, specs, join(node, sub), `${entry}:${sub.slice(0, -3)}`);
+            addFileCommand(pi, specs, join(node, sub), `${entry}:${sub.slice(0, -3)}`, root);
           }
           continue;
         }
         if (!entry.endsWith(".md")) continue;
-        addFileCommand(pi, specs, node, commandName(entry.slice(0, -3), prefixRules));
+        addFileCommand(pi, specs, node, commandName(entry.slice(0, -3), prefixRules), root);
       }
     }
 
@@ -524,7 +523,7 @@ export default function (pi: ExtensionAPI) {
         if (entry.startsWith(".")) continue;
         const skillFile = join(skillsDir, entry, "SKILL.md");
         if (!isFile(skillFile)) continue;
-        addSkillCommand(pi, specs, skillFile, entry);
+        addSkillCommand(pi, specs, skillFile, entry, root);
       }
     }
   } catch (err) {
@@ -541,46 +540,13 @@ export default function (pi: ExtensionAPI) {
     return { ...event.payload, model };
   });
 
-  pi.on("session_start", async (_event: unknown, ctx: unknown) => {
-    const shadowedCount = shadowedAgents.length + shadowedCommands.length;
-    const lines = [
-      `agent-porter：注册 ${specs.length} 个命令（${specs.map((s) => `/${s.command}`).join(", ") || "无"}）`,
-    ];
-    if (shadowedCount > 0) {
-      const entries: string[] = [];
-      for (const s of shadowedAgents) {
-        entries.push(`  去重: ${s.name} ← ${s.winner}（覆盖 ${s.file}）`);
-      }
-      for (const s of shadowedCommands) {
-        entries.push(`  去重: /${s.command} ← ${s.winner}（覆盖 ${s.file}）`);
-      }
-      lines.push(...entries.slice(0, 15));
-      if (entries.length > 15) {
-        lines.push(`  … 另有 ${entries.length - 15} 条去重（多源同名，先到先得）`);
-      }
-    }
-    const report = lines.join("\n");
-    const porterCtx = isPorterContext(ctx) ? ctx : undefined;
-    if (porterCtx?.hasUI && porterCtx.ui) {
-      porterCtx.ui.notify(report, "info");
-    } else {
-      console.error(`[agent-porter] ${report}`);
-    }
-  });
-
   // 统一注册（共享 taken 集合，命令名冲突先到先得）
   const taken = new Set<string>();
+  const registered: CommandSpec[] = [];
   for (const spec of specs) {
-    if (taken.has(spec.command)) {
-      const winner = specs.find((s) => s.command === spec.command);
-      shadowedCommands.push({
-        command: spec.command,
-        file: spec.file,
-        winner: winner ? winner.file : spec.command,
-      });
-      continue;
-    }
+    if (taken.has(spec.command)) continue;
     taken.add(spec.command);
+    registered.push(spec);
     pi.registerCommand(spec.command, {
       description: spec.description,
       handler: async (args: string, ctx: unknown) => {
@@ -592,6 +558,32 @@ export default function (pi: ExtensionAPI) {
       },
     });
   }
+
+  pi.on("session_start", async (_event: unknown, ctx: unknown) => {
+    const skills = registered.filter((s) => s.kind === "skill").length;
+    const commands = registered.filter((s) => s.kind === "command").length;
+    const agents = registered.filter((s) => s.kind === "agent").length;
+    // 按展示标签去重：项目级与用户级同名 harness（如 .codebuddy）只列一次
+    const roots = [
+      ...new Set(
+        registered.map((s) => {
+          const rel = relative(cwd, s.root);
+          if (rel && rel !== "." && !rel.startsWith("..")) return rel;
+          const relHome = relative(home, s.root);
+          return relHome && relHome !== "." && !relHome.startsWith("..")
+            ? relHome
+            : s.root;
+        }),
+      ),
+    ].join("、");
+    const report = `agent-porter：已加载 ${skills} 个技能、${commands} 个指令、${agents} 个智能体（load ${roots || "无"}）`;
+    const porterCtx = isPorterContext(ctx) ? ctx : undefined;
+    if (porterCtx?.hasUI && porterCtx.ui) {
+      porterCtx.ui.notify(report, "info");
+    } else {
+      console.error(`[agent-porter] ${report}`);
+    }
+  });
 }
 
 /** 注册一条文件指令命令（外来 harness 的 commands/） */
@@ -600,6 +592,7 @@ function addFileCommand(
   specs: CommandSpec[],
   file: string,
   command: string,
+  root: string,
 ): void {
   let text: string;
   try {
@@ -613,7 +606,7 @@ function addFileCommand(
     command,
     description: truncate(description, 80),
     kind: "command",
-    file,
+    root,
     run: (args) => {
       const expanded = expandCommandTemplate(body.trim(), args);
       sendInjected(pi, expanded);
@@ -627,6 +620,7 @@ function addSkillCommand(
   specs: CommandSpec[],
   file: string,
   skillName: string,
+  root: string,
 ): void {
   let text: string;
   try {
@@ -641,7 +635,7 @@ function addSkillCommand(
     command: skillName,
     description: `技能：${truncate(description, 80)}`,
     kind: "skill",
-    file,
+    root,
     run: (args) => {
       // 与原生 /skill:<name> 用户调用模板一致：正文 + skill 目录 + 用户参数
       const parts = [`【技能调用】${skillName}`, body.trim(), ""];

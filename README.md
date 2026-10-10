@@ -41,18 +41,20 @@ git clone https://github.com/penjj/agent-porter <project>/.omp/extensions/agent-
 ## 扫描（多源组合去重，先到先得）
 
 项目级（cwd）：所有含对应子目录（`agents/`、`commands/`、
-`skills/`）的 dot-dir——`.agents`、`.omp` 优先，其余字典序
-（`.claude`、`.codebuddy`、`.qoder`、`.github`、…）。
+`skills/`）的目录——dot-dir 与普通目录皆可（`.codebuddy/`
+与 `Doubao/` 同等对待）。`.agents`、`.omp` 优先，其余字典序
+（`.claude`、`.qoder`、`.github`、…）。
 用户级（~）：`~/.omp/agent/agents`（agent 原生根）、`~/.agents/`
-（标准）、其余 `~/.*/`。
+（标准）、其余 `~/` 下任意目录。
 
 command 与 skill 的扫描**跳过原生已覆盖的根**（`.omp`、`.claude`、
 `.agent[s]`、`.codex`、`.opencode`，skill 另有 `.github`）——
 这些 omp 已原生发现，移植会重复。
 
-同名定义只注册第一个，其余记入会话启动报告（超过 15 条只列
-前 15 条 + 计数）。命令名冲突（不同文件映射到同一命令）同样
-去重。原件零改动。
+同名定义与命令名冲突都是先到先得（按扫描顺序），其余静默
+丢弃。会话启动时只打印一行摘要：已加载的技能 / 指令 / 智能体
+计数与来源 harness 路径（如 `load .codebuddy、.omp`）。
+原件零改动。
 
 ## 命令命名
 
