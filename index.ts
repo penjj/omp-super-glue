@@ -1,5 +1,5 @@
 /**
- * agent-porter — 把其他 harness 的 agents / commands / skills 注册为
+ * super-glue — 把其他 harness 的 agents / commands / skills 注册为
  * omp 斜杠命令。
  *
  * 布局约定（demo 与本仓库实测）：智能体在 `<harness>/agents/<name>.md`，
@@ -407,7 +407,7 @@ export default function (pi: ExtensionAPI) {
   let specs: CommandSpec[] = [];
   let oneShotModel: string | undefined;
 
-  pi.setLabel("Agent Porter");
+  pi.setLabel("Super Glue");
 
   const cwd = process.cwd();
   const home = homedir();
@@ -527,7 +527,7 @@ export default function (pi: ExtensionAPI) {
       }
     }
   } catch (err) {
-    console.error(`[agent-porter] 扫描失败: ${String(err)}`);
+    console.error(`[super-glue] 扫描失败: ${String(err)}`);
   }
 
   // 模型别名：仅对 inline 模式的下一发请求生效（task 工具不支持按派发指定模型）
@@ -553,7 +553,7 @@ export default function (pi: ExtensionAPI) {
         try {
           spec.run(args, ctx);
         } catch (err) {
-          console.error(`[agent-porter] 命令 /${spec.command} 执行失败: ${String(err)}`);
+          console.error(`[super-glue] 命令 /${spec.command} 执行失败: ${String(err)}`);
         }
       },
     });
@@ -576,12 +576,12 @@ export default function (pi: ExtensionAPI) {
         }),
       ),
     ].join("、");
-    const report = `agent-porter：已加载 ${skills} 个技能、${commands} 个指令、${agents} 个智能体（load ${roots || "无"}）`;
+    const report = `super-glue：已加载 ${skills} 个技能、${commands} 个指令、${agents} 个智能体（load ${roots || "无"}）`;
     const porterCtx = isPorterContext(ctx) ? ctx : undefined;
     if (porterCtx?.hasUI && porterCtx.ui) {
       porterCtx.ui.notify(report, "info");
     } else {
-      console.error(`[agent-porter] ${report}`);
+      console.error(`[super-glue] ${report}`);
     }
   });
 }

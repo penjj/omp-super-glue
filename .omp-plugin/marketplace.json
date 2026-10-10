@@ -6,7 +6,7 @@
   },
   "plugins": [
     {
-      "name": "agent-porter",
+      "name": "super-glue",
       "source": "./",
       "description": "把其他 harness（codebuddy/qoder/claude/cursor/…）的 agents、commands、skills 移植为 omp 斜杠命令",
       "version": "0.1.0",

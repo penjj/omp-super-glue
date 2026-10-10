@@ -1,4 +1,4 @@
-# agent-porter
+# super-glue
 
 把其他 harness 的三类产物注册为 omp 斜杠命令：
 
@@ -13,14 +13,14 @@
 ```bash
 # 一键（omp 插件市场）
 omp plugin marketplace add https://github.com/penjj/agent-porter
-omp plugin install agent-porter
+omp plugin install super-glue
 
 # 或从本地路径安装
-omp install /path/to/agent-porter
+omp install /path/to/super-glue
 
 # 或手动：克隆到扩展目录
-git clone https://github.com/penjj/agent-porter ~/.omp/agent/extensions/agent-porter    # 全局（所有项目）
-git clone https://github.com/penjj/agent-porter <project>/.omp/extensions/agent-porter  # 项目级（仅本项目）
+git clone https://github.com/penjj/agent-porter ~/.omp/agent/extensions/super-glue    # 全局（所有项目）
+git clone https://github.com/penjj/agent-porter <project>/.omp/extensions/super-glue  # 项目级（仅本项目）
 ```
 
 两种扩展目录 omp 都自动发现（实测）。
